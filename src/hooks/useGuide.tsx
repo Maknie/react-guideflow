@@ -8,54 +8,70 @@ export const useGuide = (options: GuideOptions) => {
     const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
     const observerRef = useRef<MutationObserver | null>(null);
 
+    // Use refs to store the latest values without causing re-renders
+    const optionsRef = useRef(options);
+    const stepsRef = useRef(options.steps);
+
+    // Update refs when options change
+    useEffect(() => {
+        optionsRef.current = options;
+        stepsRef.current = options.steps;
+    });
+
     const { steps, onStart, onComplete, onStepChange, onClose } = options;
 
-    // Start guide
+    // Start guide - stable function
     const startGuide = useCallback(() => {
-        if (steps.length === 0) return;
+        if (stepsRef.current.length === 0) return;
         setCurrentStep(0);
         setIsActive(true);
-        onStart?.();
-    }, [steps, onStart]);
+        optionsRef.current.onStart?.();
+    }, []); // No dependencies - uses refs
 
-    // Stop guide
+    // Stop guide - stable function
     const stopGuide = useCallback(() => {
         setIsActive(false);
         setCurrentStep(0);
         setHighlightedElement(null);
-        onClose?.();
-    }, [onClose]);
+        optionsRef.current.onClose?.();
+    }, []); // No dependencies - uses refs
 
-    // Next step
+    // Next step - stable function
     const nextStep = useCallback(() => {
-        if (currentStep < steps.length - 1) {
-            const newStep = currentStep + 1;
-            setCurrentStep(newStep);
-            onStepChange?.(newStep);
-        } else {
-            setIsActive(false);
-            onComplete?.();
-        }
-    }, [currentStep, steps.length, onStepChange, onComplete]);
+        setCurrentStep(prevStep => {
+            if (prevStep < stepsRef.current.length - 1) {
+                const newStep = prevStep + 1;
+                optionsRef.current.onStepChange?.(newStep);
+                return newStep;
+            } else {
+                setIsActive(false);
+                optionsRef.current.onComplete?.();
+                return prevStep;
+            }
+        });
+    }, []); // No dependencies - uses refs and functional updates
 
-    // Previous step
+    // Previous step - stable function
     const prevStep = useCallback(() => {
-        if (currentStep > 0) {
-            const newStep = currentStep - 1;
-            setCurrentStep(newStep);
-            onStepChange?.(newStep);
-        }
-    }, [currentStep, onStepChange]);
+        setCurrentStep(prevStep => {
+            if (prevStep > 0) {
+                const newStep = prevStep - 1;
+                optionsRef.current.onStepChange?.(newStep);
+                return newStep;
+            }
+            return prevStep;
+        });
+    }, []); // No dependencies - uses refs and functional updates
 
-    // Go to specific step
+    // Go to specific step - stable function
     const goToStep = useCallback((stepIndex: number) => {
-        if (stepIndex >= 0 && stepIndex < steps.length) {
+        if (stepIndex >= 0 && stepIndex < stepsRef.current.length) {
             setCurrentStep(stepIndex);
-            onStepChange?.(stepIndex);
+            optionsRef.current.onStepChange?.(stepIndex);
         }
-    }, [steps.length, onStepChange]);
+    }, []); // No dependencies - uses refs
 
-    // Calculate tooltip position
+    // Calculate tooltip position - stable function
     const calculateTooltipPosition = useCallback((
         elementRect: DOMRect,
         placement: GuideStep['placement'] = 'auto'
@@ -100,20 +116,22 @@ export const useGuide = (options: GuideOptions) => {
         }
 
         return { x, y };
-    }, []);
+    }, []); // No dependencies - only uses constants and window
 
-    // Update highlight
+    // Update highlight - now with stable dependencies
     const updateHighlight = useCallback(() => {
-        if (!isActive || !steps[currentStep]) return;
+        if (!isActive) return;
 
-        const step = steps[currentStep];
-        const element = document.querySelector(step.selector);
+        const currentStepData = stepsRef.current[currentStep];
+        if (!currentStepData) return;
+
+        const element = document.querySelector(currentStepData.selector);
 
         if (element) {
             const rect = element.getBoundingClientRect();
             setHighlightedElement(rect);
 
-            const position = calculateTooltipPosition(rect, step.placement);
+            const position = calculateTooltipPosition(rect, currentStepData.placement);
             setTooltipPosition(position);
 
             element.scrollIntoView({
@@ -122,65 +140,66 @@ export const useGuide = (options: GuideOptions) => {
                 inline: 'center'
             });
         }
-    }, [isActive, currentStep, steps, calculateTooltipPosition]);
+    }, [isActive, currentStep, calculateTooltipPosition]); // Minimal stable dependencies
 
-    // Effects
+    // Main effect - now with stable dependencies
     useEffect(() => {
-        if (isActive) {
-            updateHighlight();
+        if (!isActive) return;
 
-            const observer = new MutationObserver(updateHighlight);
-            observerRef.current = observer;
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class']
-            });
+        updateHighlight();
 
-            const handleResize = () => updateHighlight();
-            window.addEventListener('resize', handleResize);
-            window.addEventListener('scroll', handleResize);
+        const observer = new MutationObserver(updateHighlight);
+        observerRef.current = observer;
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
 
-            // Keyboard navigation
-            const handleKeyDown = (e: KeyboardEvent) => {
-                if (!options.allowKeyboardNavigation) return;
+        const handleResize = () => updateHighlight();
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('scroll', handleResize);
 
-                switch (e.key) {
-                    case 'ArrowRight':
-                    case ' ':
-                        e.preventDefault();
-                        nextStep();
-                        break;
-                    case 'ArrowLeft':
-                        e.preventDefault();
-                        prevStep();
-                        break;
-                    case 'Escape':
-                        e.preventDefault();
-                        stopGuide();
-                        break;
-                }
-            };
+        // Keyboard navigation
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!optionsRef.current.allowKeyboardNavigation) return;
 
-            if (options.allowKeyboardNavigation) {
-                window.addEventListener('keydown', handleKeyDown);
+            switch (e.key) {
+                case 'ArrowRight':
+                case ' ':
+                    e.preventDefault();
+                    nextStep();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    prevStep();
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    stopGuide();
+                    break;
             }
+        };
 
-            return () => {
-                if (observerRef.current) {
-                    observerRef.current.disconnect();
-                    observerRef.current = null;
-                }
-                window.removeEventListener('resize', handleResize);
-                window.removeEventListener('scroll', handleResize);
-                if (options.allowKeyboardNavigation) {
-                    window.removeEventListener('keydown', handleKeyDown);
-                }
-            };
+        if (optionsRef.current.allowKeyboardNavigation) {
+            window.addEventListener('keydown', handleKeyDown);
         }
-    }, [isActive, updateHighlight, options.allowKeyboardNavigation, nextStep, prevStep, stopGuide]);
 
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+                observerRef.current = null;
+            }
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('scroll', handleResize);
+            if (optionsRef.current.allowKeyboardNavigation) {
+                window.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+    }, [isActive, updateHighlight, nextStep, prevStep, stopGuide]);
+
+    // Separate effect for current step changes
     useEffect(() => {
         if (isActive) {
             updateHighlight();

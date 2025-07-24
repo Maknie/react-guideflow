@@ -13,6 +13,9 @@ interface GuideTooltipProps {
     onNext: () => void;
     onPrev: () => void;
     onClose: () => void;
+    backButtonText?: string;
+    nextButtonText?: string;
+    finishButtonText?: string;
 }
 
 export const GuideTooltip: React.FC<GuideTooltipProps> = ({
@@ -25,7 +28,10 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
     showProgress = true,
     onNext,
     onPrev,
-    onClose
+    onClose,
+    backButtonText = 'Back',
+    nextButtonText = 'Next',
+    finishButtonText = 'Finish'
 }) => {
     if (!isActive || !step) return null;
 
@@ -97,23 +103,25 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                             </span>
                         )}
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                                onClick={onPrev}
-                                disabled={currentStep === 0}
-                                style={{
-                                    padding: '6px 12px',
-                                    border: `1px solid ${borderColor}`,
-                                    background: 'transparent',
-                                    color: textColor,
-                                    borderRadius: '4px',
-                                    cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
-                                    opacity: currentStep === 0 ? 0.5 : 1,
-                                    fontSize: '12px'
-                                }}
-                            >
-                                ← Back
-                            </button>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            {totalSteps > 1 && (
+                                <button
+                                    onClick={onPrev}
+                                    disabled={currentStep === 0}
+                                    style={{
+                                        padding: '6px 12px',
+                                        border: `1px solid ${borderColor}`,
+                                        background: 'transparent',
+                                        color: textColor,
+                                        borderRadius: '4px',
+                                        cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                                        opacity: currentStep === 0 ? 0.5 : 1,
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    ← {backButtonText}
+                                </button>
+                            )}
 
                             {currentStep === totalSteps - 1 ? (
                                 <button
@@ -128,7 +136,7 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                                         fontSize: '12px'
                                     }}
                                 >
-                                    Finish
+                                    {finishButtonText}
                                 </button>
                             ) : (
                                 <button
@@ -143,7 +151,7 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                                         fontSize: '12px'
                                     }}
                                 >
-                                    Next →
+                                    {nextButtonText} →
                                 </button>
                             )}
                         </div>
