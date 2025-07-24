@@ -15,6 +15,7 @@ interface GuideTooltipProps {
     onClose: () => void;
     backButtonText?: string;
     nextButtonText?: string;
+    hideFinishButton?: boolean;
     finishButtonText?: string;
 }
 
@@ -31,7 +32,8 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
     onClose,
     backButtonText = 'Back',
     nextButtonText = 'Next',
-    finishButtonText = 'Finish'
+    finishButtonText = 'Finish',
+    hideFinishButton = false
 }) => {
     if (!isActive || !step) return null;
 
@@ -97,9 +99,9 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
 
                     {/* Footer */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {showProgress && (
+                        {showProgress && totalSteps > 1 && (
                             <span style={{ fontSize: '12px', opacity: 0.6 }}>
-                                Step {currentStep + 1} of {totalSteps}
+                                {currentStep + 1} / {totalSteps}
                             </span>
                         )}
 
@@ -124,20 +126,25 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                             )}
 
                             {currentStep === totalSteps - 1 ? (
-                                <button
-                                    onClick={onClose}
-                                    style={{
-                                        padding: '6px 12px',
-                                        border: 'none',
-                                        background: '#1976d2',
-                                        color: '#fff',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                    }}
-                                >
-                                    {finishButtonText}
-                                </button>
+                                <>
+                                    {
+                                        !hideFinishButton &&
+                                        <button
+                                            onClick={onClose}
+                                            style={{
+                                                padding: '6px 12px',
+                                                border: 'none',
+                                                background: '#1976d2',
+                                                color: '#fff',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer',
+                                                fontSize: '12px'
+                                            }}
+                                        >
+                                            {finishButtonText}
+                                        </button>
+                                    }
+                                </>
                             ) : (
                                 <button
                                     onClick={onNext}

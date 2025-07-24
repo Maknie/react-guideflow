@@ -7,7 +7,7 @@ export interface GuideStep {
 }
 
 export interface GuideOptions {
-  steps: GuideStep[];
+  steps: GuideStep[] ;
   onStart?: () => void;
   onComplete?: () => void;
   onStepChange?: (step: number) => void;

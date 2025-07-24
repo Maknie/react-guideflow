@@ -36,6 +36,14 @@ export const useGuide = (options: GuideOptions) => {
         optionsRef.current.onClose?.();
     }, []); // No dependencies - uses refs
 
+    const addStep = useCallback((step: GuideStep) => {
+        stepsRef.current.push(step);
+    }, []);
+
+    const removeStep = useCallback((selector: string) => {
+        stepsRef.current = stepsRef.current.filter(step => step.selector !== selector);
+    }, []);
+
     // Next step - stable function
     const nextStep = useCallback(() => {
         setCurrentStep(prevStep => {
@@ -217,6 +225,8 @@ export const useGuide = (options: GuideOptions) => {
         ...state,
         startGuide,
         stopGuide,
+        addStep,
+        removeStep,
         nextStep,
         prevStep,
         goToStep,

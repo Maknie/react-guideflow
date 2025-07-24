@@ -1,4 +1,5 @@
 export { useGuide } from './hooks/useGuide';
+export { GuideProvider, useGuideContext } from './context/GuideContext';
 export { GuideOverlay } from './components/GuideOverlay';
 export { GuideTooltip } from './components/GuideTooltip';
 export type { GuideStep, GuideOptions, GuideState } from './types';
