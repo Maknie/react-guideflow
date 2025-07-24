@@ -1,4 +1,3 @@
-// src/index.ts
 export { useGuide } from './hooks/useGuide';
 export { GuideOverlay } from './components/GuideOverlay';
 export { GuideTooltip } from './components/GuideTooltip';
@@ -7,8 +6,8 @@ export type { GuideStep, GuideOptions, GuideState } from './types';
 // Example usage:
 /*
 // Hook-based approach (recommended for libraries)
-import { useGuide, GuideOverlay, GuideTooltip } from 'react-guideflow';
- 
+import { useGuide, GuideOverlay, GuideTooltip } from 'react-guide-tour';
+
 const MyComponent = () => {
   const guide = useGuide({
     steps: [
@@ -17,7 +16,7 @@ const MyComponent = () => {
     onComplete: () => console.log('Tour completed!'),
     allowKeyboardNavigation: true
   });
- 
+
   return (
     <div>
       <button data-tour="button" onClick={guide.startGuide}>Start Tour</button>
@@ -39,5 +38,5 @@ const MyComponent = () => {
     </div>
   );
 };
- 
+
 */
