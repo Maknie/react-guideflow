@@ -1,6 +1,6 @@
 {
   "name": "react-guideflow",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A flexible, lightweight React library for creating interactive step-by-step guides and tours",
   "type": "module",
   "main": "dist/index.js",
