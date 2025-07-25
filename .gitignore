@@ -101,11 +101,10 @@ storybook-static/
 tmp/
 temp/
 
-# Package lock files (choose one based on your preference)
 # Comment out the one you want to keep
-package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
+# package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # TypeScript
 *.tsbuildinfo

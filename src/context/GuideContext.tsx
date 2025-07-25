@@ -61,8 +61,6 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
         stepsRef.current = steps;
     }, [steps]);
 
-    const { onStart, onComplete, onStepChange, onClose } = options;
-
     const startGuide = useCallback(() => {
         if (stepsRef.current.length === 0) return;
         setCurrentStep(0);

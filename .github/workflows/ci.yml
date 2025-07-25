@@ -2,71 +2,115 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
+      - develop
 
 jobs:
   test:
+    name: Test on Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [16.x, 18.x, 20.x]
+        node-version: [18.x, 20.x, 22.x]
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "Warning: package-lock.json not found, falling back to npm install"
+            npm install
+          fi
 
-    - name: Run linter
-      run: npm run lint
+      - name: Install test dependencies
+        run: npm install --save-dev jest ts-jest @testing-library/react @testing-library/jest-dom @types/jest identity-obj-proxy jest-environment-jsdom
 
-    - name: Run tests
-      run: npm test
+      - name: Run linter
+        run: npm run lint || { echo "Linting failed"; exit 1; }
 
-    - name: Build package
-      run: npm run build
+      - name: Run tests
+        run: npm test || { echo "Tests failed"; exit 1; }
 
-    - name: Check build output
-      run: |
-        ls -la dist/
-        test -f dist/index.js
-        test -f dist/index.d.ts
+      - name: Run TypeScript type checking
+        run: npm run type-check
+        if: matrix.node-version == '20.x'
+
+      - name: Build package
+        run: npm run build || { echo "Build failed"; exit 1; }
+
+      - name: Check build output
+        run: |
+          ls -la dist/
+          if [ ! -f dist/index.js ]; then echo "dist/index.js not found"; exit 1; fi
+          if [ ! -f dist/index.d.ts ]; then echo "dist/index.d.ts not found"; exit 1; fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.node-version }}
+          path: dist/
+          retention-days: 1
 
   publish:
+    name: Publish to npm
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-        registry-url: 'https://registry.npmjs.org'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Build package
-      run: npm run build
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-20.x
+          path: dist/
 
-    - name: Publish to NPM
-      run: npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # Only publish if version has changed
-      continue-on-error: true
+      - name: Check version
+        id: check-version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if npm view react-guideflow@$CURRENT_VERSION >/dev/null 2>&1; then
+            echo "Version $CURRENT_VERSION already published, skipping publish"
+            echo "skip_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "Version $CURRENT_VERSION not found, proceeding with publish"
+            echo "skip_publish=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm
+        if: steps.check-version.outputs.skip_publish == 'false'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

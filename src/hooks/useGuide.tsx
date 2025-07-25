@@ -18,7 +18,7 @@ export const useGuide = (options: GuideOptions) => {
         stepsRef.current = options.steps;
     });
 
-    const { steps, onStart, onComplete, onStepChange, onClose } = options;
+    const { steps } = options;
 
     // Start guide - stable function
     const startGuide = useCallback(() => {
