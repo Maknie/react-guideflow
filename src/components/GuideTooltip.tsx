@@ -13,10 +13,14 @@ interface GuideTooltipProps {
     onNext: () => void;
     onPrev: () => void;
     onClose: () => void;
+    onDontShowAnymore?: () => void;
     backButtonText?: string;
     nextButtonText?: string;
     hideFinishButton?: boolean;
     finishButtonText?: string;
+    showDontShowAnymore?: boolean;
+    dontShowAnymoreText?: string | React.ReactNode;
+    dontShowAnymorePosition?: 'left' | 'center' | 'bottom';
 }
 
 export const GuideTooltip: React.FC<GuideTooltipProps> = ({
@@ -30,10 +34,14 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
     onNext,
     onPrev,
     onClose,
+    onDontShowAnymore,
     backButtonText = 'Back',
     nextButtonText = 'Next',
     finishButtonText = 'Finish',
-    hideFinishButton = false
+    hideFinishButton = false,
+    showDontShowAnymore = true,
+    dontShowAnymoreText = "Don't show anymore",
+    dontShowAnymorePosition = 'left'
 }) => {
     if (!isActive || !step) return null;
 
@@ -41,6 +49,44 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
     const bgColor = isDark ? '#333' : '#fff';
     const textColor = isDark ? '#fff' : '#000';
     const borderColor = isDark ? '#555' : '#ddd';
+
+    const handleDontShowAnymore = () => {
+        if (onDontShowAnymore) {
+            onDontShowAnymore();
+        }
+    };
+
+    const renderDontShowAnymore = () => {
+        if (!showDontShowAnymore || !onDontShowAnymore) return null;
+
+        if (typeof dontShowAnymoreText !== 'string') {
+            return dontShowAnymoreText;
+        }
+
+        return (
+            <button
+                onClick={handleDontShowAnymore}
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#666',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '2px 4px',
+                    opacity: 0.7,
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0.7';
+                }}
+            >
+                {dontShowAnymoreText}
+            </button>
+        );
+    };
 
     return (
         <AnimatePresence>
@@ -98,13 +144,30 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                     )}
 
                     {/* Footer */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        {showProgress && totalSteps > 1 && (
-                            <span style={{ fontSize: '12px', opacity: 0.6 }}>
-                                {currentStep + 1} / {totalSteps}
-                            </span>
-                        )}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '8px'
+                    }}>
+                        {/* Left side - Progress and "Don't show anymore" */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            flex: '0 1 auto'
+                        }}>
+                            {showProgress && totalSteps > 1 && (
+                                <span style={{ fontSize: '12px', opacity: 0.6 }}>
+                                    {currentStep + 1} / {totalSteps}
+                                </span>
+                            )}
 
+                            {dontShowAnymorePosition === 'left' && renderDontShowAnymore()}
+                        </div>
+
+                        {/* Right side - Navigation buttons */}
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                             {totalSteps > 1 && (
                                 <button
@@ -163,6 +226,30 @@ export const GuideTooltip: React.FC<GuideTooltipProps> = ({
                             )}
                         </div>
                     </div>
+
+                    {/* Center positioned "Don't show anymore" */}
+                    {dontShowAnymorePosition === 'center' && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            marginTop: '8px'
+                        }}>
+                            {renderDontShowAnymore()}
+                        </div>
+                    )}
+
+                    {/* Bottom positioned "Don't show anymore" */}
+                    {dontShowAnymorePosition === 'bottom' && (
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'center',
+                            marginTop: '12px',
+                            paddingTop: '8px',
+                            borderTop: `1px solid ${borderColor}`
+                        }}>
+                            {renderDontShowAnymore()}
+                        </div>
+                    )}
                 </motion.div>
             )}
         </AnimatePresence>

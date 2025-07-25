@@ -20,6 +20,9 @@ interface GuideContextType extends GuideState {
     goToStep: (stepIndex: number) => void;
     highlightedElement: DOMRect | null;
     tooltipPosition: { x: number; y: number };
+    dontShowAnymore: () => void;
+    cancelDontShowAnymore: () => void;
+    isDismissed: boolean;
 }
 
 const GuideContext = createContext<GuideContextType | undefined>(undefined);
@@ -35,13 +38,22 @@ export const useGuideContext = () => {
 interface GuideProviderProps {
     options: GuideOptions;
     children: ReactNode;
+    // Optional props for "don't show anymore" functionality
+    persistenceKey?: string; // Unique key for localStorage
+    storageType?: 'localStorage' | 'sessionStorage' | 'memory'; // Storage method
 }
 
-export const GuideProvider = ({ options, children }: GuideProviderProps) => {
+export const GuideProvider = ({
+    options,
+    children,
+    persistenceKey = 'guide-dismissed',
+    storageType = 'localStorage'
+}: GuideProviderProps) => {
     const [isActive, setIsActive] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const [highlightedElement, setHighlightedElement] = useState<DOMRect | null>(null);
     const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+    const [isDismissed, setIsDismissed] = useState(false);
     // Add steps state
     const [steps, setSteps] = useState(options.steps);
     const observerRef = useRef<MutationObserver | null>(null);
@@ -49,6 +61,55 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
     // Use refs for non-rendering updates
     const optionsRef = useRef(options);
     const stepsRef = useRef(steps);
+
+    // Storage helper functions
+    const getStorageValue = useCallback((key: string): string | null => {
+        try {
+            switch (storageType) {
+                case 'localStorage':
+                    return typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+                case 'sessionStorage':
+                    return typeof window !== 'undefined' ? sessionStorage.getItem(key) : null;
+                case 'memory':
+                default:
+                    return null; // Memory storage would need to be implemented separately
+            }
+        } catch (error) {
+            console.warn('Failed to read from storage:', error);
+            return null;
+        }
+    }, [storageType]);
+
+    const setStorageValue = useCallback((key: string, value: string) => {
+        try {
+            switch (storageType) {
+                case 'localStorage':
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(key, value);
+                    }
+                    break;
+                case 'sessionStorage':
+                    if (typeof window !== 'undefined') {
+                        sessionStorage.setItem(key, value);
+                    }
+                    break;
+                case 'memory':
+                default:
+                    // Memory storage would need to be implemented separately
+                    break;
+            }
+        } catch (error) {
+            console.warn('Failed to write to storage:', error);
+        }
+    }, [storageType]);
+
+    // Check if guide has been dismissed on mount
+    useEffect(() => {
+        const dismissed = getStorageValue(persistenceKey);
+        if (dismissed === 'true') {
+            setIsDismissed(true);
+        }
+    }, [getStorageValue, persistenceKey]);
 
     // Sync refs with state and props
     useEffect(() => {
@@ -62,11 +123,16 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
     }, [steps]);
 
     const startGuide = useCallback(() => {
+        if (isDismissed) {
+            console.log('Guide has been dismissed by user');
+            return;
+        }
+
         if (stepsRef.current.length === 0) return;
         setCurrentStep(0);
         setIsActive(true);
         optionsRef.current.onStart?.();
-    }, []);
+    }, [isDismissed]);
 
     const stopGuide = useCallback(() => {
         setIsActive(false);
@@ -82,6 +148,19 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
         setHighlightedElement(null);
         optionsRef.current.onClose?.();
     }, []);
+
+    // New function to handle "don't show anymore"
+    const dontShowAnymore = useCallback(() => {
+        setIsDismissed(true);
+        setStorageValue(persistenceKey, 'true');
+        stopGuide();
+        optionsRef.current.onDismiss?.(); // Optional callback for when user dismisses
+    }, [setStorageValue, persistenceKey, stopGuide]);
+
+    const cancelDontShowAnymore = useCallback(() => {
+        setIsDismissed(false);
+        setStorageValue(persistenceKey, 'false');
+    }, [setStorageValue, persistenceKey]);
 
     // Fixed addStep to update state immutably
     const addStep = useCallback((step: GuideStep) => {
@@ -192,7 +271,7 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
             block: 'center',
             inline: 'center',
         });
-    }, [isActive, currentStep, calculateTooltipPosition]);
+    }, [isActive, currentStep, calculateTooltipPosition, removeStep]);
 
     useEffect(() => {
         if (!isActive) return;
@@ -274,6 +353,9 @@ export const GuideProvider = ({ options, children }: GuideProviderProps) => {
         goToStep,
         highlightedElement,
         tooltipPosition,
+        dontShowAnymore,
+        cancelDontShowAnymore,
+        isDismissed,
     };
 
     return <GuideContext.Provider value={value}>{children}</GuideContext.Provider>;

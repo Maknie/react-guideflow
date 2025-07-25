@@ -12,6 +12,8 @@ A flexible, lightweight React library for creating interactive step-by-step guid
 - 🌐 **Context-based API** - Use `GuideProvider` and `useGuideContext` for global access
 - 🎯 **Smart Positioning** - Auto-positioning with placement options
 - 🔄 **Dynamic Steps** - Add or remove steps programmatically during the tour
+- 💾 **Persistence** - "Don't show anymore" functionality with localStorage/sessionStorage support
+- ⚡ **Smart Dismissal** - Prevents guide from showing again when user dismisses permanently
 
 ## Installation
 
@@ -49,7 +51,7 @@ const steps = [
 ];
 
 const StepController = () => {
-  const { startGuide, addStep } = useGuideContext();
+  const { startGuide, addStep, isDismissed } = useGuideContext();
 
   const handleAddStep = () => {
     addStep({
@@ -63,7 +65,9 @@ const StepController = () => {
 
   return (
     <div>
-      <button onClick={startGuide}>Start Tour</button>
+      <button onClick={startGuide} disabled={isDismissed}>
+        {isDismissed ? 'Guide Dismissed' : 'Start Tour'}
+      </button>
       <button onClick={handleAddStep}>Add Dynamic Step</button>
     </div>
   );
@@ -76,12 +80,17 @@ const App = () => {
     onComplete: () => console.log('Tour completed'),
     onStepChange: (step: number) => console.log(`Step changed to ${step + 1}`),
     onClose: () => console.log('Tour closed'),
+    onDismiss: () => console.log('Tour dismissed permanently'),
     allowKeyboardNavigation: true,
     theme: 'light',
   };
 
   return (
-    <GuideProvider options={guideOptions}>
+    <GuideProvider 
+      options={guideOptions}
+      persistenceKey="my-app-guide-dismissed"
+      storageType="localStorage"
+    >
       <div>
         <h1 data-tour="welcome">Welcome to Dashboard</h1>
         <button data-tour="settings">Settings</button>
@@ -100,9 +109,13 @@ const App = () => {
           position={useGuideContext().tooltipPosition}
           theme="light"
           showProgress={true}
+          showDontShowAnymore={true}
+          dontShowAnymoreText="Don't show this guide again"
+          dontShowAnymorePosition="bottom"
           onNext={useGuideContext().nextStep}
           onPrev={useGuideContext().prevStep}
           onClose={useGuideContext().stopGuide}
+          onDontShowAnymore={useGuideContext().dontShowAnymore}
         />
       </div>
     </GuideProvider>
@@ -135,6 +148,7 @@ interface GuideOptions {
   onComplete?: () => void; // Called when guide completes
   onStepChange?: (step: number) => void; // Called when step changes
   onClose?: () => void; // Called when guide is closed
+  onDismiss?: () => void; // Called when user clicks "don't show anymore"
   theme?: 'light' | 'dark'; // Theme for overlay and tooltip
   showProgress?: boolean; // Show progress indicator in tooltip
   allowKeyboardNavigation?: boolean; // Enable keyboard navigation
@@ -149,6 +163,22 @@ Wrap your application or a subtree with `GuideProvider` to provide guide functio
 interface GuideProviderProps {
   options: GuideOptions;
   children: React.ReactNode;
+  persistenceKey?: string; // Unique key for localStorage (default: 'guide-dismissed')
+  storageType?: 'localStorage' | 'sessionStorage' | 'memory'; // Storage method (default: 'localStorage')
+}
+```
+
+### GuideTooltip
+
+Enhanced tooltip component with dismissal functionality.
+
+```typescript
+interface GuideTooltipProps {
+  // ... existing props
+  onDontShowAnymore?: () => void; // Callback for "don't show anymore"
+  showDontShowAnymore?: boolean; // Show the dismissal button (default: true)
+  dontShowAnymoreText?: string | React.ReactNode; // Custom text/content for dismissal button
+  dontShowAnymorePosition?: 'left' | 'center' | 'bottom'; // Position of dismissal button (default: 'left')
 }
 ```
 
@@ -165,16 +195,148 @@ The `useGuideContext` hook provides access to the guide's state and methods:
   currentStepData?: GuideStep; // Data for the current step
   highlightedElement: DOMRect | null; // Bounding rect of the highlighted element
   tooltipPosition: { x: number; y: number }; // Position for the tooltip
+  isDismissed: boolean; // Whether the guide has been permanently dismissed
 
   // Actions
-  startGuide: () => void; // Start the guide
+  startGuide: () => void; // Start the guide (won't start if dismissed)
   stopGuide: () => void; // Stop the guide
   addStep: (step: GuideStep) => void; // Add a new step dynamically
   removeStep: (selector: string) => void; // Remove a step by selector
   nextStep: () => void; // Go to the next step
   prevStep: () => void; // Go to the previous step
   goToStep: (stepIndex: number) => void; // Jump to a specific step
+  dontShowAnymore: () => void; // Permanently dismiss the guide
 }
+```
+
+## Persistence & Dismissal
+
+### Don't Show Anymore Functionality
+
+Users can permanently dismiss guides to improve user experience:
+
+```tsx
+const App = () => {
+  const guideOptions = {
+    steps: mySteps,
+    onDismiss: () => {
+      console.log('User chose not to see this guide again');
+      // Optional: Send analytics or update user preferences
+    },
+  };
+
+  return (
+    <GuideProvider 
+      options={guideOptions}
+      persistenceKey="onboarding-guide" // Unique key for this guide
+      storageType="localStorage" // Persists across sessions
+    >
+      <MyApp />
+    </GuideProvider>
+  );
+};
+```
+
+### Storage Options
+
+- **localStorage**: Persists across browser sessions (default)
+- **sessionStorage**: Persists only for the current session
+- **memory**: No persistence, resets on page reload
+
+### Customizing Dismissal UI
+
+```tsx
+// Simple string - package handles the click
+<GuideTooltip
+  // ... other props
+  showDontShowAnymore={true}
+  dontShowAnymoreText="Skip future tutorials"
+  dontShowAnymorePosition="bottom"
+  onDontShowAnymore={dontShowAnymore}
+/>
+
+// Custom ReactNode with styled text - package handles the click
+<GuideTooltip
+  // ... other props
+  showDontShowAnymore={true}
+  dontShowAnymoreText={
+    <span style={{ color: 'red', fontWeight: 'bold' }}>
+      🚫 Never show again
+    </span>
+  }
+  onDontShowAnymore={dontShowAnymore}
+/>
+
+// Custom ReactNode with own click handler - you handle the click
+<GuideTooltip
+  // ... other props
+  showDontShowAnymore={true}
+  dontShowAnymoreText={
+    <button 
+      onClick={() => {
+        // Your custom logic here
+        console.log('Custom dismissal logic');
+        dontShowAnymore(); // Call the package function
+      }}
+      style={{ 
+        background: 'none',
+        border: '1px solid #ccc',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        cursor: 'pointer'
+      }}
+    >
+      Custom Dismiss Button
+    </button>
+  }
+  // onDontShowAnymore not needed when ReactNode handles its own click
+/>
+
+// Complex custom component with multiple interactions
+<GuideTooltip
+  // ... other props  
+  showDontShowAnymore={true}
+  dontShowAnymoreText={
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <input 
+        type="checkbox" 
+        id="dont-show-checkbox"
+        onChange={(e) => {
+          if (e.target.checked) {
+            dontShowAnymore();
+          }
+        }}
+      />
+      <label 
+        htmlFor="dont-show-checkbox" 
+        style={{ fontSize: '11px', cursor: 'pointer' }}
+      >
+        Don't show this again
+      </label>
+    </div>
+  }
+/>
+```
+
+### Checking Dismissal Status
+
+```tsx
+const MyComponent = () => {
+  const { isDismissed, startGuide } = useGuideContext();
+
+  useEffect(() => {
+    // Only show guide for new users
+    if (!isDismissed && isNewUser) {
+      startGuide();
+    }
+  }, [isDismissed, isNewUser, startGuide]);
+
+  return (
+    <button onClick={startGuide} disabled={isDismissed}>
+      {isDismissed ? 'Guide Disabled' : 'Show Tutorial'}
+    </button>
+  );
+};
 ```
 
 ## Keyboard Navigation
@@ -199,8 +361,17 @@ Customize the appearance of the guide:
 import { useGuideContext } from 'react-guideflow';
 
 const CustomTooltip = () => {
-  const { isActive, currentStepData, currentStep, totalSteps, tooltipPosition, nextStep, prevStep, stopGuide } =
-    useGuideContext();
+  const { 
+    isActive, 
+    currentStepData, 
+    currentStep, 
+    totalSteps, 
+    tooltipPosition, 
+    nextStep, 
+    prevStep, 
+    stopGuide,
+    dontShowAnymore 
+  } = useGuideContext();
 
   if (!isActive || !currentStepData) return null;
 
@@ -224,6 +395,9 @@ const CustomTooltip = () => {
         </button>
         <button onClick={nextStep}>Next</button>
         <button onClick={stopGuide}>Close</button>
+        <button onClick={dontShowAnymore} style={{ fontSize: '12px', opacity: 0.7 }}>
+          Don't show again
+        </button>
         <p>
           Step {currentStep + 1} of {totalSteps}
         </p>
@@ -231,20 +405,67 @@ const CustomTooltip = () => {
     </div>
   );
 };
+```
 
+## Advanced Usage
+
+### Multiple Guides with Different Persistence
+
+```tsx
 const App = () => {
   return (
-    <GuideProvider options={guideOptions}>
-      <div>
-        <h1 data-tour="welcome">Welcome</h1>
-        <CustomTooltip />
-      </div>
-    </GuideProvider>
+    <div>
+      {/* Onboarding guide */}
+      <GuideProvider 
+        options={onboardingOptions}
+        persistenceKey="onboarding-guide"
+        storageType="localStorage"
+      >
+        <OnboardingFlow />
+      </GuideProvider>
+
+      {/* Feature tour guide */}
+      <GuideProvider 
+        options={featureTourOptions}
+        persistenceKey="feature-tour-guide"
+        storageType="sessionStorage"
+      >
+        <FeatureTour />
+      </GuideProvider>
+    </div>
   );
 };
 ```
 
-## Advanced Usage
+### Conditional Guide Display
+
+```tsx
+const SmartGuideController = () => {
+  const { startGuide, isDismissed } = useGuideContext();
+  const [userLevel, setUserLevel] = useState('beginner');
+
+  useEffect(() => {
+    // Only show guide for beginners who haven't dismissed it
+    if (userLevel === 'beginner' && !isDismissed) {
+      const timer = setTimeout(() => startGuide(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [userLevel, isDismissed, startGuide]);
+
+  return (
+    <div>
+      <select value={userLevel} onChange={(e) => setUserLevel(e.target.value)}>
+        <option value="beginner">Beginner</option>
+        <option value="advanced">Advanced</option>
+      </select>
+      
+      {!isDismissed && (
+        <button onClick={startGuide}>Show Tutorial</button>
+      )}
+    </div>
+  );
+};
+```
 
 ### Dynamic Step Management
 
@@ -254,9 +475,14 @@ Add or remove steps dynamically during the tour:
 import { GuideProvider, useGuideContext } from 'react-guideflow';
 
 const StepController = () => {
-  const { addStep, removeStep, startGuide } = useGuideContext();
+  const { addStep, removeStep, startGuide, isDismissed } = useGuideContext();
 
   const handleAddStep = () => {
+    if (isDismissed) {
+      alert('Guide has been dismissed. Please refresh to reset.');
+      return;
+    }
+    
     addStep({
       selector: '[data-tour="new-step"]',
       title: 'New Feature',
@@ -273,43 +499,13 @@ const StepController = () => {
 
   return (
     <div>
-      <button onClick={handleAddStep}>Add Step</button>
-      <button onClick={handleRemoveStep}>Remove Welcome Step</button>
+      <button onClick={handleAddStep} disabled={isDismissed}>
+        Add Step
+      </button>
+      <button onClick={handleRemoveStep} disabled={isDismissed}>
+        Remove Welcome Step
+      </button>
     </div>
-  );
-};
-
-const App = () => {
-  const guideOptions = {
-    steps: [
-      {
-        selector: '[data-tour="welcome"]',
-        title: 'Welcome',
-        description: 'This is the welcome section.',
-        placement: 'bottom',
-      },
-    ],
-    allowKeyboardNavigation: true,
-  };
-
-  return (
-    <GuideProvider options={guideOptions}>
-      <div>
-        <h1 data-tour="welcome">Welcome</h1>
-        <div data-tour="new-step">New Feature</div>
-        <StepController />
-        <GuideTooltip
-          isActive={useGuideContext().isActive}
-          step={useGuideContext().currentStepData}
-          currentStep={useGuideContext().currentStep}
-          totalSteps={useGuideContext().totalSteps}
-          position={useGuideContext().tooltipPosition}
-          onNext={useGuideContext().nextStep}
-          onPrev={useGuideContext().prevStep}
-          onClose={useGuideContext().stopGuide}
-        />
-      </div>
-    </GuideProvider>
   );
 };
 ```
@@ -320,10 +516,12 @@ Jump to specific steps or control the flow programmatically:
 
 ```tsx
 const StepController = () => {
-  const { goToStep, nextStep, stopGuide } = useGuideContext();
+  const { goToStep, nextStep, stopGuide, isDismissed } = useGuideContext();
 
   const handleSpecialAction = () => {
-    goToStep(2); // Jump to step 3
+    if (!isDismissed) {
+      goToStep(2); // Jump to step 3
+    }
   };
 
   const handleConditionalNext = () => {
@@ -336,7 +534,9 @@ const StepController = () => {
 
   return (
     <div>
-      <button onClick={handleSpecialAction}>Jump to Step 3</button>
+      <button onClick={handleSpecialAction} disabled={isDismissed}>
+        Jump to Step 3
+      </button>
       <button onClick={handleConditionalNext}>Smart Next</button>
       <button onClick={stopGuide}>Stop Tour</button>
     </div>
@@ -344,52 +544,32 @@ const StepController = () => {
 };
 ```
 
-### Integration with Router
-
-Navigate to different routes during the tour:
+### Integration with User Preferences
 
 ```tsx
-import { useNavigate } from 'react-router-dom';
-import { GuideProvider, useGuideContext } from 'react-guideflow';
-
-const StepController = () => {
-  const { startGuide } = useGuideContext();
-  const navigate = useNavigate();
-
-  return (
-    <button
-      onClick={() => {
-        navigate('/dashboard');
-        setTimeout(() => startGuide(), 500); // Start guide after navigation
-      }}
-    >
-      Go to Dashboard and Start Tour
-    </button>
-  );
-};
+import { useUser } from './user-context';
 
 const App = () => {
+  const { user, updateUserPreferences } = useUser();
+  
   const guideOptions = {
-    steps: [
-      {
-        selector: '[data-tour="nav-home"]',
-        title: 'Navigation',
-        description: 'Use this to navigate to different pages',
-      },
-    ],
-    onStepChange: (stepIndex) => {
-      if (stepIndex === 1) {
-        navigate('/dashboard');
-      }
+    steps: onboardingSteps,
+    onDismiss: () => {
+      // Update user preferences when guide is dismissed
+      updateUserPreferences({
+        ...user.preferences,
+        showOnboardingGuide: false
+      });
     },
   };
 
   return (
-    <GuideProvider options={guideOptions}>
-      <div>
-        <nav data-tour="nav-home">Home</nav>
-        <StepController />
-      </div>
+    <GuideProvider 
+      options={guideOptions}
+      persistenceKey={`guide-${user.id}`} // User-specific persistence
+      storageType="localStorage"
+    >
+      <MyApp />
     </GuideProvider>
   );
 };
@@ -397,7 +577,7 @@ const App = () => {
 
 ## Examples
 
-### E-commerce Onboarding
+### E-commerce Onboarding with Dismissal
 
 ```tsx
 const ecommerceSteps = [
@@ -421,18 +601,58 @@ const ecommerceSteps = [
   },
 ];
 
-const App = () => (
-  <GuideProvider options={{ steps: ecommerceSteps }}>
-    <div>
-      <input data-tour="search" type="text" placeholder="Search..." />
-      <button data-tour="cart">Cart</button>
-      <div data-tour="profile">Profile</div>
-    </div>
-  </GuideProvider>
-);
+const EcommerceApp = () => {
+  const guideOptions = {
+    steps: ecommerceSteps,
+    onDismiss: () => {
+      // Track dismissal for analytics
+      analytics.track('onboarding_dismissed');
+    },
+  };
+
+  return (
+    <GuideProvider 
+      options={guideOptions}
+      persistenceKey="ecommerce-onboarding"
+      storageType="localStorage"
+    >
+      <div>
+        <input data-tour="search" type="text" placeholder="Search..." />
+        <button data-tour="cart">Cart</button>
+        <div data-tour="profile">Profile</div>
+        
+        <GuideTooltip
+          // ... standard props
+          showDontShowAnymore={true}
+          dontShowAnymoreText={
+            <button 
+              onClick={() => {
+                // Custom analytics tracking
+                analytics.track('onboarding_skipped');
+                useGuideContext().dontShowAnymore();
+              }}
+              style={{
+                background: 'linear-gradient(45deg, #ff6b6b, #ff8e8e)',
+                color: 'white',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '10px',
+                cursor: 'pointer'
+              }}
+            >
+              ⏭️ Skip onboarding
+            </button>
+          }
+          dontShowAnymorePosition="center"
+        />
+      </div>
+    </GuideProvider>
+  );
+};
 ```
 
-### Dashboard Tour with Custom Content
+### Dashboard Tour with Custom Content and Dismissal
 
 ```tsx
 const dashboardSteps = [
@@ -449,13 +669,46 @@ const dashboardSteps = [
   },
 ];
 
-const App = () => (
-  <GuideProvider options={{ steps: dashboardSteps }}>
-    <div>
-      <div data-tour="metrics">Metrics Dashboard</div>
-    </div>
-  </GuideProvider>
-);
+const DashboardApp = () => {
+  const { isDismissed } = useGuideContext();
+  
+  return (
+    <GuideProvider 
+      options={{ steps: dashboardSteps }}
+      persistenceKey="dashboard-tour"
+      storageType="sessionStorage" // Only for current session
+    >
+      <div>
+        <div data-tour="metrics">Metrics Dashboard</div>
+        
+        {!isDismissed && (
+          <div className="tour-hint">
+            💡 New to the dashboard? Take a quick tour!
+          </div>
+        )}
+        
+        <GuideTooltip
+          // ... props
+          showDontShowAnymore={true}
+          dontShowAnymoreText={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox"
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    useGuideContext().dontShowAnymore();
+                  }
+                }}
+                style={{ transform: 'scale(0.8)' }}
+              />
+              <span style={{ fontSize: '10px' }}>Hide for session</span>
+            </div>
+          }
+        />
+      </div>
+    </GuideProvider>
+  );
+};
 ```
 
 ## Browser Support
@@ -497,6 +750,16 @@ npm run lint
 MIT © Akniyet Maratov
 
 ## Changelog
+
+### v1.0.6
+- **New Feature**: Added "Don't show anymore" functionality with persistent dismissal
+- Added `isDismissed` state to track guide dismissal status
+- Added `dontShowAnymore()` method to permanently dismiss guides
+- Added `persistenceKey` and `storageType` props to `GuideProvider`
+- Added dismissal-related props to `GuideTooltip` component
+- Added `onDismiss` callback to `GuideOptions`
+- Enhanced user experience with smart dismissal prevention
+- Improved documentation with dismissal examples
 
 ### v1.0.5
 - **Breaking Change**: Replaced `useGuide` hook with `GuideProvider` and `useGuideContext` for a Context-based API

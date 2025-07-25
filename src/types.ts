@@ -12,6 +12,7 @@ export interface GuideOptions {
   onComplete?: () => void;
   onStepChange?: (step: number) => void;
   onClose?: () => void;
+  onDismiss?: () => void;
   theme?: 'light' | 'dark';
   showProgress?: boolean;
   allowKeyboardNavigation?: boolean;
