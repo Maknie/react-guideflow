@@ -498,7 +498,7 @@ MIT © Akniyet Maratov
 
 ## Changelog
 
-### v1.0.4
+### v1.0.5
 - **Breaking Change**: Replaced `useGuide` hook with `GuideProvider` and `useGuideContext` for a Context-based API
 - Added `addStep` and `removeStep` for dynamic step management
 - Improved step updates to ensure reactivity
