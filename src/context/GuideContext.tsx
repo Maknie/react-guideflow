@@ -55,7 +55,7 @@ export const GuideProvider = ({
     const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
     const [isDismissed, setIsDismissed] = useState(false);
     // Add steps state
-    const [steps, setSteps] = useState(options.steps);
+    const [steps, setSteps] = useState<GuideStep[]>(options.steps);
     const observerRef = useRef<MutationObserver | null>(null);
 
     // Use refs for non-rendering updates
@@ -164,6 +164,7 @@ export const GuideProvider = ({
 
     // Fixed addStep to update state immutably
     const addStep = useCallback((step: GuideStep) => {
+        if(steps.find(actualStep => actualStep.selector === step.selector)) return;
         setSteps((prevSteps) => [...prevSteps, step]);
     }, []);
 
