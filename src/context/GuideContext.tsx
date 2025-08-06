@@ -22,6 +22,7 @@ interface GuideContextType extends GuideState {
     tooltipPosition: { x: number; y: number };
     dontShowAnymore: () => void;
     cancelDontShowAnymore: () => void;
+    restartGuide: () => void;
     isDismissed: boolean;
 }
 
@@ -160,11 +161,20 @@ export const GuideProvider = ({
     const cancelDontShowAnymore = useCallback(() => {
         setIsDismissed(false);
         setStorageValue(persistenceKey, 'false');
-    }, [setStorageValue, persistenceKey]);
+        setCurrentStep(0);
+        setIsActive(true);
+    }, [setStorageValue, persistenceKey, setCurrentStep, setIsActive]);
+
+    const restartGuide = useCallback(() => {
+        setIsDismissed(false);
+        setStorageValue(persistenceKey, 'false');
+        setCurrentStep(0);
+        setIsActive(true);
+    }, []);
 
     // Fixed addStep to update state immutably
     const addStep = useCallback((step: GuideStep) => {
-        if(steps.find(actualStep => actualStep.selector === step.selector)) return;
+        if (steps.find(actualStep => actualStep.selector === step.selector)) return;
         setSteps((prevSteps) => [...prevSteps, step]);
     }, []);
 
@@ -357,6 +367,7 @@ export const GuideProvider = ({
         dontShowAnymore,
         cancelDontShowAnymore,
         isDismissed,
+        restartGuide,
     };
 
     return <GuideContext.Provider value={value}>{children}</GuideContext.Provider>;
